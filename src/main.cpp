@@ -9,6 +9,7 @@
 #include "MqttSettings.h"
 #include "NetworkSettings.h"
 #include "NtpSettings.h"
+#include "StatusIndicator.h"
 #include "Utils.h"
 #include "WebApi.h"
 #include "defaults.h"
@@ -37,6 +38,8 @@ void setup()
     } else {
         Serial.println(F("done"));
     }
+    // Initialize Status indicators
+    LEDsetup();
 
     // Read configuration values
     Serial.print(F("Reading configuration... "));
@@ -142,5 +145,7 @@ void loop()
     MqttHandleHass.loop();
     yield();
     WebApi.loop();
+    yield();
+    LEDloop();
     yield();
 }

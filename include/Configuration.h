@@ -4,9 +4,9 @@
 #include <Arduino.h>
 
 #define CONFIG_FILENAME "/config.json"
-#define CONFIG_VERSION 0x00011700 // 0.1.23 // make sure to clean all after change
+#define CONFIG_VERSION 0x00011800 // 0.1.24 // make sure to clean all after change
 
-#define WIFI_MAX_SSID_STRLEN 31
+#define WIFI_MAX_SSID_STRLEN 32
 #define WIFI_MAX_PASSWORD_STRLEN 64
 #define WIFI_MAX_HOSTNAME_STRLEN 31
 
@@ -19,7 +19,7 @@
 #define MQTT_MAX_PASSWORD_STRLEN 64
 #define MQTT_MAX_TOPIC_STRLEN 32
 #define MQTT_MAX_LWTVALUE_STRLEN 20
-#define MQTT_MAX_ROOT_CA_CERT_STRLEN 2048
+#define MQTT_MAX_ROOT_CA_CERT_STRLEN 2560
 
 #define INV_MAX_NAME_STRLEN 31
 #define INV_MAX_COUNT 10
@@ -27,16 +27,23 @@
 
 #define CHAN_MAX_NAME_STRLEN 31
 
-#define JSON_BUFFER_SIZE 6144
+#define DEV_MAX_MAPPING_NAME_STRLEN 63
+
+#define JSON_BUFFER_SIZE 12288
 
 struct CHANNEL_CONFIG_T {
     uint16_t MaxChannelPower;
     char Name[CHAN_MAX_NAME_STRLEN];
+    float YieldTotalOffset;
 };
 
 struct INVERTER_CONFIG_T {
     uint64_t Serial;
     char Name[INV_MAX_NAME_STRLEN + 1];
+    bool Poll_Enable;
+    bool Poll_Enable_Night;
+    bool Command_Enable;
+    bool Command_Enable_Night;
     CHANNEL_CONFIG_T channel[INV_MAX_CHAN_COUNT];
 };
 
@@ -57,6 +64,8 @@ struct CONFIG_T {
     char Ntp_Server[NTP_MAX_SERVER_STRLEN + 1];
     char Ntp_Timezone[NTP_MAX_TIMEZONE_STRLEN + 1];
     char Ntp_TimezoneDescr[NTP_MAX_TIMEZONEDESCR_STRLEN + 1];
+    double Ntp_Longitude;
+    double Ntp_Latitude;
 
     bool Mqtt_Enabled;
     uint Mqtt_Port;
@@ -88,6 +97,13 @@ struct CONFIG_T {
 
     char Security_Password[WIFI_MAX_PASSWORD_STRLEN + 1];
     bool Security_AllowReadonly;
+
+    char Dev_PinMapping[DEV_MAX_MAPPING_NAME_STRLEN + 1];
+
+    bool Display_PowerSafe;
+    bool Display_ScreenSaver;
+    bool Display_ShowLogo;
+    uint8_t Display_Contrast;
 };
 
 class ConfigurationClass {

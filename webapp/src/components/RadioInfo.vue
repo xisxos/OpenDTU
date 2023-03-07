@@ -1,48 +1,47 @@
 <template>
-    <div class="card">
-        <div class="card-header text-bg-primary">
-            Radio Information
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover table-condensed">
-                    <tbody>
-                        <tr>
-                            <th>Chip Status</th>
-                            <td class="badge" :class="{
-                                'text-bg-danger': !systemStatus.radio_connected,
-                                'text-bg-success': systemStatus.radio_connected,
-                            }">
-                                <span v-if="systemStatus.radio_connected">connected</span>
-                                <span v-else>not connected</span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Chip Type</th>
-                            <td class="badge" :class="{
+    <CardElement :text="$t('radioinfo.RadioInformation')" textVariant="text-bg-primary">
+        <div class="table-responsive">
+            <table class="table table-hover table-condensed">
+                <tbody>
+                    <tr>
+                        <th>{{ $t('radioinfo.ChipStatus') }}</th>
+                        <td>
+                            <StatusBadge :status="systemStatus.radio_connected" true_text="radioinfo.Connected" false_text="radioinfo.NotConnected" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ $t('radioinfo.ChipType') }}</th>
+                        <td>
+                            <span class="badge" :class="{
                                 'text-bg-danger': systemStatus.radio_connected && !systemStatus.radio_pvariant,
                                 'text-bg-success': systemStatus.radio_connected && systemStatus.radio_pvariant,
                                 'text-bg-secondary': !systemStatus.radio_connected,
                             }">
-                                <span
-                                    v-if="systemStatus.radio_connected && systemStatus.radio_pvariant">nRF24L01+</span>
-                                <span
-                                    v-else-if="systemStatus.radio_connected && !systemStatus.radio_pvariant">nRF24L01</span>
-                                <span v-else>Unknown</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                                <template
+                                    v-if="systemStatus.radio_connected && systemStatus.radio_pvariant">nRF24L01+</template>
+                                <template
+                                    v-else-if="systemStatus.radio_connected && !systemStatus.radio_pvariant">nRF24L01</template>
+                                <template v-else>{{ $t('radioinfo.Unknown') }}</template>
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-    </div>
+    </CardElement>
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from 'vue';
+import CardElement from '@/components/CardElement.vue';
+import StatusBadge from './StatusBadge.vue';
 import type { SystemStatus } from '@/types/SystemStatus';
+import { defineComponent, type PropType } from 'vue';
 
 export default defineComponent({
+    components: {
+        CardElement,
+        StatusBadge,
+    },
     props: {
         systemStatus: { type: Object as PropType<SystemStatus>, required: true },
     },

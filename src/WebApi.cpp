@@ -18,6 +18,7 @@ void WebApiClass::init()
     _server.addHandler(&_events);
 
     _webApiConfig.init(&_server);
+    _webApiDevice.init(&_server);
     _webApiDevInfo.init(&_server);
     _webApiDtu.init(&_server);
     _webApiEventlog.init(&_server);
@@ -33,6 +34,7 @@ void WebApiClass::init()
     _webApiSecurity.init(&_server);
     _webApiSysstatus.init(&_server);
     _webApiWebapp.init(&_server);
+    _webApiWsConsole.init(&_server);
     _webApiWsLive.init(&_server);
 
     _server.begin();
@@ -41,6 +43,7 @@ void WebApiClass::init()
 void WebApiClass::loop()
 {
     _webApiConfig.loop();
+    _webApiDevice.loop();
     _webApiDevInfo.loop();
     _webApiDtu.loop();
     _webApiEventlog.loop();
@@ -55,6 +58,7 @@ void WebApiClass::loop()
     _webApiSecurity.loop();
     _webApiSysstatus.loop();
     _webApiWebapp.loop();
+    _webApiWsConsole.loop();
     _webApiWsLive.loop();
 }
 
@@ -84,6 +88,13 @@ bool WebApiClass::checkCredentialsReadonly(AsyncWebServerRequest* request)
     } else {
         return checkCredentials(request);
     }
+}
+
+void WebApiClass::sendTooManyRequests(AsyncWebServerRequest* request)
+{
+    auto response = request->beginResponse(429, "text/plain", "Too Many Requests");
+    response->addHeader("Retry-After", "60");
+    request->send(response);
 }
 
 WebApiClass WebApi;

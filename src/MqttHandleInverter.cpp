@@ -3,6 +3,7 @@
  * Copyright (C) 2022 Thomas Basler and others
  */
 #include "MqttHandleInverter.h"
+#include "MessageOutput.h"
 #include "MqttSettings.h"
 #include <ctime>
 
@@ -95,15 +96,18 @@ void MqttHandleInverterClass::loop()
                 _lastPublishStats[i] = lastUpdate;
 
                 // Loop all channels
-                for (uint8_t c = 0; c <= inv->Statistics()->getChannelCount(); c++) {
-                    if (c > 0) {
-                        INVERTER_CONFIG_T* inv_cfg = Configuration.getInverterConfig(inv->serial());
-                        if (inv_cfg != nullptr) {
-                            MqttSettings.publish(inv->serialString() + "/" + String(c) + "/name", inv_cfg->channel[c - 1].Name);
+                for (auto& t : inv->Statistics()->getChannelTypes()) {
+                    for (auto& c : inv->Statistics()->getChannelsByType(t)) {
+                        if (t == TYPE_DC) {
+                            INVERTER_CONFIG_T* inv_cfg = Configuration.getInverterConfig(inv->serial());
+                            if (inv_cfg != nullptr) {
+                                // TODO(tbnobody)
+                                MqttSettings.publish(inv->serialString() + "/" + String(static_cast<uint8_t>(c) + 1) + "/name", inv_cfg->channel[c].Name);
+                            }
                         }
-                    }
-                    for (uint8_t f = 0; f < sizeof(_publishFields); f++) {
-                        publishField(inv, c, _publishFields[f]);
+                        for (uint8_t f = 0; f < sizeof(_publishFields) / sizeof(FieldId_t); f++) {
+                            publishField(inv, t, c, _publishFields[f]);
+                        }
                     }
                 }
             }
@@ -115,31 +119,39 @@ void MqttHandleInverterClass::loop()
     }
 }
 
-void MqttHandleInverterClass::publishField(std::shared_ptr<InverterAbstract> inv, uint8_t channel, uint8_t fieldId)
+void MqttHandleInverterClass::publishField(std::shared_ptr<InverterAbstract> inv, ChannelType_t type, ChannelNum_t channel, FieldId_t fieldId)
 {
-    String topic = getTopic(inv, channel, fieldId);
+    String topic = getTopic(inv, type, channel, fieldId);
     if (topic == "") {
         return;
     }
 
-    MqttSettings.publish(topic, String(inv->Statistics()->getChannelFieldValue(channel, fieldId)));
+    MqttSettings.publish(topic, String(inv->Statistics()->getChannelFieldValue(type, channel, fieldId)));
 }
 
-String MqttHandleInverterClass::getTopic(std::shared_ptr<InverterAbstract> inv, uint8_t channel, uint8_t fieldId)
+String MqttHandleInverterClass::getTopic(std::shared_ptr<InverterAbstract> inv, ChannelType_t type, ChannelNum_t channel, FieldId_t fieldId)
 {
-    if (!inv->Statistics()->hasChannelFieldValue(channel, fieldId)) {
+    if (!inv->Statistics()->hasChannelFieldValue(type, channel, fieldId)) {
         return String("");
     }
 
     String chanName;
-    if (channel == 0 && fieldId == FLD_PDC) {
+    if (type == TYPE_AC && fieldId == FLD_PDC) {
         chanName = "powerdc";
     } else {
-        chanName = inv->Statistics()->getChannelFieldName(channel, fieldId);
+        chanName = inv->Statistics()->getChannelFieldName(type, channel, fieldId);
         chanName.toLowerCase();
     }
 
-    return inv->serialString() + "/" + String(channel) + "/" + chanName;
+    String chanNum;
+    if (type == TYPE_DC) {
+        // TODO(tbnobody)
+        chanNum = static_cast<uint8_t>(channel) + 1;
+    } else {
+        chanNum = channel;
+    }
+
+    return inv->serialString() + "/" + chanNum + "/" + chanName;
 }
 
 void MqttHandleInverterClass::onMqttMessage(const espMqttClientTypes::MessageProperties& properties, const char* topic, const uint8_t* payload, size_t len, size_t index, size_t total)
@@ -168,7 +180,7 @@ void MqttHandleInverterClass::onMqttMessage(const espMqttClientTypes::MessagePro
     auto inv = Hoymiles.getInverterBySerial(serial);
 
     if (inv == nullptr) {
-        Serial.println(F("Inverter not found"));
+        MessageOutput.println(F("Inverter not found"));
         return;
     }
 
@@ -185,44 +197,44 @@ void MqttHandleInverterClass::onMqttMessage(const espMqttClientTypes::MessagePro
 
     if (!strcmp(setting, TOPIC_SUB_LIMIT_PERSISTENT_RELATIVE)) {
         // Set inverter limit relative persistent
-        Serial.printf("Limit Persistent: %d %%\n", payload_val);
+        MessageOutput.printf("Limit Persistent: %d %%\r\n", payload_val);
         inv->sendActivePowerControlRequest(Hoymiles.getRadio(), payload_val, PowerLimitControlType::RelativPersistent);
 
     } else if (!strcmp(setting, TOPIC_SUB_LIMIT_PERSISTENT_ABSOLUTE)) {
         // Set inverter limit absolute persistent
-        Serial.printf("Limit Persistent: %d W\n", payload_val);
+        MessageOutput.printf("Limit Persistent: %d W\r\n", payload_val);
         inv->sendActivePowerControlRequest(Hoymiles.getRadio(), payload_val, PowerLimitControlType::AbsolutPersistent);
 
     } else if (!strcmp(setting, TOPIC_SUB_LIMIT_NONPERSISTENT_RELATIVE)) {
         // Set inverter limit relative non persistent
-        Serial.printf("Limit Non-Persistent: %d %%\n", payload_val);
+        MessageOutput.printf("Limit Non-Persistent: %d %%\r\n", payload_val);
         if (!properties.retain) {
             inv->sendActivePowerControlRequest(Hoymiles.getRadio(), payload_val, PowerLimitControlType::RelativNonPersistent);
         } else {
-            Serial.println("Ignored because retained");
+            MessageOutput.println("Ignored because retained");
         }
 
     } else if (!strcmp(setting, TOPIC_SUB_LIMIT_NONPERSISTENT_ABSOLUTE)) {
         // Set inverter limit absolute non persistent
-        Serial.printf("Limit Non-Persistent: %d W\n", payload_val);
+        MessageOutput.printf("Limit Non-Persistent: %d W\r\n", payload_val);
         if (!properties.retain) {
             inv->sendActivePowerControlRequest(Hoymiles.getRadio(), payload_val, PowerLimitControlType::AbsolutNonPersistent);
         } else {
-            Serial.println("Ignored because retained");
+            MessageOutput.println("Ignored because retained");
         }
 
     } else if (!strcmp(setting, TOPIC_SUB_POWER)) {
         // Turn inverter on or off
-        Serial.printf("Set inverter power to: %d\n", payload_val);
+        MessageOutput.printf("Set inverter power to: %d\r\n", payload_val);
         inv->sendPowerControlRequest(Hoymiles.getRadio(), payload_val > 0);
 
     } else if (!strcmp(setting, TOPIC_SUB_RESTART)) {
         // Restart inverter
-        Serial.printf("Restart inverter\n");
+        MessageOutput.printf("Restart inverter\r\n");
         if (!properties.retain && payload_val == 1) {
             inv->sendRestartControlRequest(Hoymiles.getRadio());
         } else {
-            Serial.println("Ignored because retained");
+            MessageOutput.println("Ignored because retained");
         }
     }
 }

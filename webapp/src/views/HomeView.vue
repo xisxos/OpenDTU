@@ -27,9 +27,10 @@
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center"
                             :class="{
-                                'text-bg-danger': !inverter.reachable,
-                                'text-bg-warning': inverter.reachable && !inverter.producing,
-                                'text-bg-primary': inverter.reachable && inverter.producing,
+                                'text-bg-tertiary': !inverter.poll_enabled,
+                                'text-bg-danger': inverter.poll_enabled && !inverter.reachable,
+                                'text-bg-warning': inverter.poll_enabled && inverter.reachable && !inverter.producing,
+                                'text-bg-primary': inverter.poll_enabled && inverter.reachable && inverter.producing,
                             }">
                             <div class="p-1 flex-grow-1">
                                 <div class="d-flex flex-wrap">
@@ -456,7 +457,9 @@ export default defineComponent({
                 'decimalTwoDigits');
         },
         inverterData(): Inverter[] {
-            return this.liveData.inverters;
+            return this.liveData.inverters.slice().sort((a : Inverter, b: Inverter) => {
+                return a.order - b.order;
+            });
         }
     },
     methods: {
@@ -532,7 +535,7 @@ export default defineComponent({
             fetch("/api/eventlog/status?inv=" + serial, { headers: authHeader() })
                 .then((response) => handleResponse(response, this.$emitter, this.$router))
                 .then((data) => {
-                    this.eventLogList = data[serial];
+                    this.eventLogList = data;
                     this.eventLogLoading = false;
                 });
 
@@ -543,10 +546,10 @@ export default defineComponent({
         },
         onShowDevInfo(serial: number) {
             this.devInfoLoading = true;
-            fetch("/api/devinfo/status", { headers: authHeader() })
+            fetch("/api/devinfo/status?inv=" + serial, { headers: authHeader() })
                 .then((response) => handleResponse(response, this.$emitter, this.$router))
                 .then((data) => {
-                    this.devInfoList = data[serial][0];
+                    this.devInfoList = data;
                     this.devInfoList.serial = serial;
                     this.devInfoLoading = false;
                 });
@@ -611,7 +614,7 @@ export default defineComponent({
             } else {
                 this.targetLimitTypeText = this.$t('home.Absolute');
                 this.targetLimitMin = 10;
-                this.targetLimitMax = (this.currentLimitList.max_power > 0 ? this.currentLimitList.max_power : 1500);
+                this.targetLimitMax = (this.currentLimitList.max_power > 0 ? this.currentLimitList.max_power : 2250);
             }
             this.targetLimitType = type;
         },

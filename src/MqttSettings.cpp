@@ -104,7 +104,12 @@ void MqttSettingsClass::performConnect()
         if (config.Mqtt_Tls) {
             static_cast<espMqttClientSecure*>(mqttClient)->setCACert(config.Mqtt_RootCaCert);
             static_cast<espMqttClientSecure*>(mqttClient)->setServer(config.Mqtt_Hostname, config.Mqtt_Port);
-            static_cast<espMqttClientSecure*>(mqttClient)->setCredentials(config.Mqtt_Username, config.Mqtt_Password);
+            if (config.Mqtt_TlsCertLogin) {
+                static_cast<espMqttClientSecure*>(mqttClient)->setCertificate(config.Mqtt_ClientCert);
+                static_cast<espMqttClientSecure*>(mqttClient)->setPrivateKey(config.Mqtt_ClientKey);
+            } else {
+                static_cast<espMqttClientSecure*>(mqttClient)->setCredentials(config.Mqtt_Username, config.Mqtt_Password);
+            }
             static_cast<espMqttClientSecure*>(mqttClient)->setWill(willTopic.c_str(), 2, config.Mqtt_Retain, config.Mqtt_LwtValue_Offline);
             static_cast<espMqttClientSecure*>(mqttClient)->setClientId(clientId.c_str());
             static_cast<espMqttClientSecure*>(mqttClient)->onConnect(std::bind(&MqttSettingsClass::onMqttConnect, this, _1));
@@ -154,7 +159,11 @@ void MqttSettingsClass::publish(const String& subtopic, const String& payload)
 {
     String topic = getPrefix();
     topic += subtopic;
-    mqttClient->publish(topic.c_str(), 0, Configuration.get().Mqtt_Retain, payload.c_str());
+
+    String value = payload;
+    value.trim();
+
+    mqttClient->publish(topic.c_str(), 0, Configuration.get().Mqtt_Retain, value.c_str());
 }
 
 void MqttSettingsClass::publishGeneric(const String& topic, const String& payload, bool retain, uint8_t qos)

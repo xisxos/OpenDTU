@@ -53,6 +53,10 @@ void WebApiPrometheusClass::onPrometheusMetricsGet(AsyncWebServerRequest* reques
         stream->print("# TYPE wifi_rssi gauge\n");
         stream->printf("wifi_rssi %d\n", WiFi.RSSI());
 
+        stream->print("# HELP wifi_bssid WiFi BSSID\n");
+        stream->print("# TYPE wifi_bssid gauge\n");
+        stream->printf("wifi_bssid %s\n", WiFi.BSSIDstr().c_str());
+
         for (uint8_t i = 0; i < Hoymiles.getNumInverters(); i++) {
             auto inv = Hoymiles.getInverterByPos(i);
 
@@ -85,7 +89,7 @@ void WebApiPrometheusClass::onPrometheusMetricsGet(AsyncWebServerRequest* reques
                         addField(stream, serial, i, inv, t, c, FLD_F);
                         addField(stream, serial, i, inv, t, c, FLD_T);
                         addField(stream, serial, i, inv, t, c, FLD_PF);
-                        addField(stream, serial, i, inv, t, c, FLD_PRA);
+                        addField(stream, serial, i, inv, t, c, FLD_Q);
                         addField(stream, serial, i, inv, t, c, FLD_EFF);
                         addField(stream, serial, i, inv, t, c, FLD_IRR);
                     }

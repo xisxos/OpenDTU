@@ -4,6 +4,7 @@
  */
 #include "WebApi_ws_live.h"
 #include "Configuration.h"
+#include "Datastore.h"
 #include "MessageOutput.h"
 #include "WebApi.h"
 #include "defaults.h"
@@ -78,8 +79,10 @@ void WebApiWsLiveClass::loop()
                 _ws.textAll(buffer);
             }
 
-        } catch (std::bad_alloc& bad_alloc) {
+        } catch (const std::bad_alloc& bad_alloc) {
             MessageOutput.printf("Call to /api/livedata/status temporarely out of resources. Reason: \"%s\".\r\n", bad_alloc.what());
+        } catch (const std::exception& exc) {
+            MessageOutput.printf("Unknown exception in /api/livedata/status. Reason: \"%s\".\r\n", exc.what());
         }
 
         _lastWsPublish = millis();
@@ -90,10 +93,6 @@ void WebApiWsLiveClass::generateJsonResponse(JsonVariant& root)
 {
     JsonArray invArray = root.createNestedArray("inverters");
 
-    float totalPower = 0;
-    float totalYieldDay = 0;
-    float totalYieldTotal = 0;
-
     // Loop all inverters
     for (uint8_t i = 0; i < Hoymiles.getNumInverters(); i++) {
         auto inv = Hoymiles.getInverterByPos(i);
@@ -102,9 +101,14 @@ void WebApiWsLiveClass::generateJsonResponse(JsonVariant& root)
         }
 
         JsonObject invObject = invArray.createNestedObject();
+        INVERTER_CONFIG_T* inv_cfg = Configuration.getInverterConfig(inv->serial());
+        if (inv_cfg == nullptr) {
+            continue;
+        }
 
         invObject["serial"] = inv->serialString();
         invObject["name"] = inv->name();
+        invObject["order"] = inv_cfg->Order;
         invObject["data_age"] = (millis() - inv->Statistics()->getLastUpdate()) / 1000;
         invObject["poll_enabled"] = inv->getEnablePolling();
         invObject["reachable"] = inv->isReachable();
@@ -121,10 +125,7 @@ void WebApiWsLiveClass::generateJsonResponse(JsonVariant& root)
             JsonObject chanTypeObj = invObject.createNestedObject(inv->Statistics()->getChannelTypeName(t));
             for (auto& c : inv->Statistics()->getChannelsByType(t)) {
                 if (t == TYPE_DC) {
-                    INVERTER_CONFIG_T* inv_cfg = Configuration.getInverterConfig(inv->serial());
-                    if (inv_cfg != nullptr) {
-                        chanTypeObj[String(static_cast<uint8_t>(c))]["name"]["u"] = inv_cfg->channel[c].Name;
-                    }
+                    chanTypeObj[String(static_cast<uint8_t>(c))]["name"]["u"] = inv_cfg->channel[c].Name;
                 }
                 addField(chanTypeObj, i, inv, t, c, FLD_PAC);
                 addField(chanTypeObj, i, inv, t, c, FLD_UAC);
@@ -141,7 +142,7 @@ void WebApiWsLiveClass::generateJsonResponse(JsonVariant& root)
                 addField(chanTypeObj, i, inv, t, c, FLD_F);
                 addField(chanTypeObj, i, inv, t, c, FLD_T);
                 addField(chanTypeObj, i, inv, t, c, FLD_PF);
-                addField(chanTypeObj, i, inv, t, c, FLD_PRA);
+                addField(chanTypeObj, i, inv, t, c, FLD_Q);
                 addField(chanTypeObj, i, inv, t, c, FLD_EFF);
                 if (t == TYPE_DC && inv->Statistics()->getStringMaxPower(c) > 0) {
                     addField(chanTypeObj, i, inv, t, c, FLD_IRR);
@@ -158,24 +159,19 @@ void WebApiWsLiveClass::generateJsonResponse(JsonVariant& root)
         if (inv->Statistics()->getLastUpdate() > _newestInverterTimestamp) {
             _newestInverterTimestamp = inv->Statistics()->getLastUpdate();
         }
-
-        for (auto& c : inv->Statistics()->getChannelsByType(TYPE_AC)) {
-            totalPower += inv->Statistics()->getChannelFieldValue(TYPE_AC, c, FLD_PAC);
-            totalYieldDay += inv->Statistics()->getChannelFieldValue(TYPE_AC, c, FLD_YD);
-            totalYieldTotal += inv->Statistics()->getChannelFieldValue(TYPE_AC, c, FLD_YT);
-        }
     }
 
     JsonObject totalObj = root.createNestedObject("total");
-    // todo: Fixed hard coded name, unit and digits
-    addTotalField(totalObj, "Power", totalPower, "W", 1);
-    addTotalField(totalObj, "YieldDay", totalYieldDay, "Wh", 0);
-    addTotalField(totalObj, "YieldTotal", totalYieldTotal, "kWh", 2);
+    addTotalField(totalObj, "Power", Datastore.getTotalAcPowerEnabled(), "W", Datastore.getTotalAcPowerDigits());
+    addTotalField(totalObj, "YieldDay", Datastore.getTotalAcYieldDayEnabled(), "Wh", Datastore.getTotalAcYieldDayDigits());
+    addTotalField(totalObj, "YieldTotal", Datastore.getTotalAcYieldTotalEnabled(), "kWh", Datastore.getTotalAcYieldTotalDigits());
 
     JsonObject hintObj = root.createNestedObject("hints");
     struct tm timeinfo;
     hintObj["time_sync"] = !getLocalTime(&timeinfo, 5);
-    hintObj["radio_problem"] = (!Hoymiles.getRadio()->isConnected() || !Hoymiles.getRadio()->isPVariant());
+    hintObj["radio_problem"] =
+        (Hoymiles.getRadioNrf()->isInitialized() && (!Hoymiles.getRadioNrf()->isConnected() || !Hoymiles.getRadioNrf()->isPVariant())) ||
+        (Hoymiles.getRadioCmt()->isInitialized() && (!Hoymiles.getRadioCmt()->isConnected()));
     if (!strcmp(Configuration.get().Security_Password, ACCESS_POINT_PASSWORD)) {
         hintObj["default_password"] = true;
     } else {
@@ -235,9 +231,11 @@ void WebApiWsLiveClass::onLivedataStatus(AsyncWebServerRequest* request)
         response->setLength();
         request->send(response);
 
-    } catch (std::bad_alloc& bad_alloc) {
+    } catch (const std::bad_alloc& bad_alloc) {
         MessageOutput.printf("Call to /api/livedata/status temporarely out of resources. Reason: \"%s\".\r\n", bad_alloc.what());
-
+        WebApi.sendTooManyRequests(request);
+    } catch (const std::exception& exc) {
+        MessageOutput.printf("Unknown exception in /api/livedata/status. Reason: \"%s\".\r\n", exc.what());
         WebApi.sendTooManyRequests(request);
     }
 }

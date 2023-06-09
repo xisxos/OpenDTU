@@ -47,6 +47,14 @@ void WebApiDeviceClass::onDeviceAdminGet(AsyncWebServerRequest* request)
     nrfPinObj["miso"] = pin.nrf24_miso;
     nrfPinObj["mosi"] = pin.nrf24_mosi;
 
+    JsonObject cmtPinObj = curPin.createNestedObject("cmt");
+    cmtPinObj["clk"] = pin.cmt_clk;
+    cmtPinObj["cs"] = pin.cmt_cs;
+    cmtPinObj["fcs"] = pin.cmt_fcs;
+    cmtPinObj["sdio"] = pin.cmt_sdio;
+    cmtPinObj["gpio2"] = pin.cmt_gpio2;
+    cmtPinObj["gpio3"] = pin.cmt_gpio3;
+
     JsonObject ethPinObj = curPin.createNestedObject("eth");
     ethPinObj["enabled"] = pin.eth_enabled;
     ethPinObj["phy_addr"] = pin.eth_phy_addr;
@@ -72,6 +80,7 @@ void WebApiDeviceClass::onDeviceAdminGet(AsyncWebServerRequest* request)
     display["power_safe"] = config.Display_PowerSafe;
     display["screensaver"] = config.Display_ScreenSaver;
     display["contrast"] = config.Display_Contrast;
+    display["language"] = config.Display_Language;
 
     response->setLength();
     request->send(response);
@@ -141,11 +150,13 @@ void WebApiDeviceClass::onDeviceAdminPost(AsyncWebServerRequest* request)
     config.Display_PowerSafe = root["display"]["power_safe"].as<bool>();
     config.Display_ScreenSaver = root["display"]["screensaver"].as<bool>();
     config.Display_Contrast = root["display"]["contrast"].as<uint8_t>();
+    config.Display_Language = root["display"]["language"].as<uint8_t>();
 
     Display.setOrientation(config.Display_Rotation);
     Display.enablePowerSafe = config.Display_PowerSafe;
     Display.enableScreensaver = config.Display_ScreenSaver;
     Display.setContrast(config.Display_Contrast);
+    Display.setLanguage(config.Display_Language);
 
     Configuration.write();
 

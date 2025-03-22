@@ -7,10 +7,19 @@ import viteCompression from 'vite-plugin-compression';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 
-const path = require('path')
+import path from 'path'
+
+// example 'vite.user.ts': export const proxy_target = '192.168.16.107'
+let proxy_target;
+try {
+    // eslint-disable-next-line
+    proxy_target = require('./vite.user.ts').proxy_target;
+} catch {
+    proxy_target = '192.168.20.110';
+}
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => { return {
   plugins: [
     vue(),
     viteCompression({ deleteOriginFile: true, threshold: 0 }),
@@ -18,6 +27,7 @@ export default defineConfig({
     VueI18nPlugin({
         /* options */
         include: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './src/locales/**.json'),
+        runtimeOnly: false,
         fullInstall: false,
         forceStringify: true,
         strictMessage: false,
@@ -35,6 +45,7 @@ export default defineConfig({
     outDir: '../webapp_dist',
     emptyOutDir: true,
     minify: 'terser',
+    chunkSizeWarningLimit: 1024,
     rollupOptions: {
       output: {
         // Only create one js file
@@ -45,25 +56,26 @@ export default defineConfig({
         assetFileNames: "assets/[name].[ext]",
       },
     },
+    target: 'es2022',
   },
   esbuild: {
-    drop: ['console', 'debugger'],
+    drop: command !== 'serve' ? ['console', 'debugger'] : []
   },
   server: {
     proxy: {
       '^/api': {
-        target: 'http://192.168.20.110/'
+        target: 'http://' + proxy_target
       },
       '^/livedata': {
-        target: 'ws://192.168.20.110/',
+        target: 'ws://' + proxy_target,
         ws: true,
         changeOrigin: true
       },
       '^/console': {
-        target: 'ws://192.168.20.110/',
+        target: 'ws://' + proxy_target,
         ws: true,
         changeOrigin: true
       }
     }
   }
-})
+} })

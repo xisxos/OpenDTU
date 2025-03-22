@@ -1,8 +1,11 @@
 <template>
-    <div class="card" :class="{
-        'border-info': channelType == 'AC',
-        'border-secondary': channelType == 'INV'
-    }">
+    <div
+        class="card card-table"
+        :class="{
+            'border-info': channelType == 'AC',
+            'border-secondary': channelType == 'INV',
+        }"
+    >
         <div v-if="channelType == 'INV'" class="card-header text-bg-secondary">
             {{ $t('inverterchannelinfo.General') }}
         </div>
@@ -16,32 +19,25 @@
             {{ $t('inverterchannelinfo.Phase', { num: channelNumber + 1 }) }}
         </div>
 
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th scope="col">{{ $t('inverterchannelinfo.Property') }}</th>
-                            <th style="text-align: right" scope="col">{{ $t('inverterchannelinfo.Value') }}</th>
-                            <th scope="col">{{ $t('inverterchannelinfo.Unit') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(property, key) in channelData" :key="`prop-${key}`">
-                            <template v-if="key != 'name' && property">
-                                <th scope="row">{{ $t('inverterchannelproperty.' + key) }}</th>
-                                <td style="text-align: right">
-                                    {{ $n(property.v, 'decimal', {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <tbody>
+                    <tr v-for="(property, key) in channelData" :key="`prop-${key}`">
+                        <template v-if="key != 'name' && property">
+                            <th scope="row">{{ $t('inverterchannelproperty.' + key) }}</th>
+                            <td class="value">
+                                {{
+                                    $n(property.v, 'decimal', {
                                         minimumFractionDigits: property.d,
-                                        maximumFractionDigits: property.d})
-                                    }}
-                                </td>
-                                <td>{{ property.u }}</td>
-                            </template>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                                        maximumFractionDigits: property.d,
+                                    })
+                                }}
+                            </td>
+                            <td>{{ property.u }}</td>
+                        </template>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </template>
